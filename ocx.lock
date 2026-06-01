@@ -3,7 +3,7 @@ lock_version = 1
 declaration_hash_version = 1
 declaration_hash = "sha256:3ab8bfd87a3325dfd6e9070556ea08a56baa735082cbcb3851c48e1eea565741"
 generated_by = "ocx 0.3.4"
-generated_at = "2026-06-01T18:38:51Z"
+generated_at = "2026-06-01T20:34:19Z"
 
 [[tool]]
 name = "cli"

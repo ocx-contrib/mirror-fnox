@@ -2,5 +2,3 @@
 [tools]
 cli = "dev.ocx.sh/ocx/cli:0.3.5-dev"
 mirror = "dev.ocx.sh/ocx/mirror:0.3.5-dev"
-
-[group]

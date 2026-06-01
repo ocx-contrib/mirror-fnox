@@ -9,8 +9,10 @@ source:
   repo: fnox
   tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
 
-# Pass 1 — Linux only. darwin/windows added in later passes.
 assets:
+  # Pass 1 — Linux only. Get discover→prepare→test→push→notify green with the
+  # deployed false-red fix before spending darwin (10x) / windows (2x) minutes.
+  # Pass 2 uncomments darwin, Pass 3 windows (assets verified present upstream).
   linux/amd64:
     # Static musl binary — portable across glibc + musl hosts. gnu also
     # ships but listing both is an ambiguous same-version match (hard error).
@@ -28,7 +30,7 @@ assets:
 
 asset_type:
   type: archive
-  strip_components: 0   # binary sits at archive root
+  strip_components: 0   # binary (fnox / fnox.exe) sits at archive root on every platform
 
 metadata:
   default: metadata.json
@@ -40,6 +42,7 @@ build_timestamp: none
 versions:
   min: "1.25.0"
   new_per_run: 5
+  poll_interval: "0 */6 * * *"
 
 verify:
   github_asset_digest: true
