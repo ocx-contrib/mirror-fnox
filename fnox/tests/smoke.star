@@ -40,7 +40,7 @@ TOKEN = "ocx-smoke-a1b2c3"
 
 # 3a: config bootstrap.
 expect.ok(ocx.run(FNOX, "init", "--skip-wizard", env = ENV))
-expect.true(ocx.exists("fnox.toml"), "init must create fnox.toml in cwd")
+expect.true(ocx.exists("fnox.toml"), msg = "init must create fnox.toml in cwd")
 
 # 3b: provider registry — proves the provider table is written and parsed back,
 # not merely that a flag was accepted.
