@@ -4,11 +4,10 @@
 # freely; the digits and the secret it stores and hands back are the contract.
 FNOX = "fnox.exe" if ocx.target_platform.os == ocx.os.Windows else "fnox"
 
-# fnox is a *stateful* CLI: it reads a global config, keeps a per-user daemon
-# and caches under the home directory, and searches parent directories for
-# `fnox.toml`. Point every home-ish variable at the scratch root so the run
-# cannot read, write, or be perturbed by anything the host already has, and
-# turn off both the daemon and the interactive prompts.
+# fnox is a *stateful* CLI: it reads a global config, caches under the home
+# directory, and searches parent directories for `fnox.toml`. Point every
+# home-ish variable at the scratch root so the run cannot read, write, or be
+# perturbed by anything the host already has, and turn off interactive prompts.
 #
 # `PATH` is deliberately absent — it is a reserved key `ocx.run` refuses to
 # override, which is what keeps the bundle's own PATH (the thing under test)
@@ -50,17 +49,22 @@ expect.contains(ocx.read_file("fnox.toml"), "plain")
 # 3c: write, then read back the EXACT token. This is the check that fails if
 # the secret store, the TOML round trip, or profile resolution regresses —
 # anchored so a substring of some longer value cannot satisfy it.
-expect.ok(ocx.run(FNOX, "--no-daemon", "set", "MY_TOKEN", TOKEN, env = ENV))
-r_get = ocx.run(FNOX, "--no-daemon", "get", "MY_TOKEN", env = ENV)
+expect.ok(ocx.run(FNOX, "set", "MY_TOKEN", TOKEN, env = ENV))
+r_get = ocx.run(FNOX, "get", "MY_TOKEN", env = ENV)
 expect.ok(r_get)
 expect.matches(r_get.stdout, r"^ocx-smoke-a1b2c3\s*$")
 
 # 3d: a second read path over the same store. `export` renders the whole
 # resolved secret set rather than one lookup, so it exercises the collection
 # path that `fnox exec` and the shell hook are built on.
-r_export = ocx.run(FNOX, "--no-daemon", "export", env = ENV)
+#
+# `--format json` is load-bearing: the DEFAULT format is not stable across the
+# mirrored range — 1.25.0 emits `export MY_TOKEN='…'` (POSIX shell) while 1.28.0
+# emits bare `MY_TOKEN=…`, and 1.28.0 moved the shell rendering behind a new
+# `shell` format. The json body is byte-identical across every version here.
+r_export = ocx.run(FNOX, "export", "--format", "json", env = ENV)
 expect.ok(r_export)
-expect.contains(r_export.stdout, "MY_TOKEN=" + TOKEN)
+expect.matches(r_export.stdout, r'"MY_TOKEN":\s*"ocx-smoke-a1b2c3"')
 
 # Tier 4: fnox is a self-contained CLI — PATH only (proven by Tier 1). Its
 # other env vars (FNOX_PROFILE, FNOX_NON_INTERACTIVE) are user knobs, not
