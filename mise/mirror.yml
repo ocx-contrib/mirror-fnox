@@ -108,15 +108,14 @@ platforms:
       - { image: "ubuntu:24.04", shell: bash }
       - { image: "alpine:3.20",  shell: sh }
       - { image: "fedora:40",    shell: bash }
-  # Pass 2 — darwin. Uncomment together with the `assets:` keys above.
-  # darwin/amd64:
-  #   # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 —
-  #   # GitHub's native macos-13 Intel pool is exhausted and deadlocks push.
-  #   runner: macos-14
-  #   prefix: ["arch", "-x86_64"]
-  # darwin/arm64:
-  #   runner: macos-14
-  #   shell: bash
+  darwin/amd64:
+    # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 —
+    # GitHub's native macos-13 Intel pool is exhausted and deadlocks push.
+    runner: macos-14
+    prefix: ["arch", "-x86_64"]
+  darwin/arm64:
+    runner: macos-14
+    shell: bash
   # Pass 3 — windows. DELETE this whole `platforms:` block instead of
   # uncommenting these two: ../mirror-base.yml already declares all six
   # exactly as written here.
@@ -177,15 +176,15 @@ assets:
     - "^mise-v.*-linux-x64-musl$"
   linux/arm64:
     - "^mise-v.*-linux-arm64-musl$"
-  # Pass 2 — darwin. Uncomment together with nothing else; `platforms:` (in
-  # ../mirror-base.yml) already declares both, and a platform with no matching
-  # `assets:` key never enters a version's resolved set, so its legs self-skip
-  # until this lands. macOS has a single libc family — no `+libc.*` suffix, and
-  # no container legs (rejected at spec load on a non-Linux platform).
-  # darwin/amd64:
-  #   - "^mise-v.*-macos-x64$"
-  # darwin/arm64:
-  #   - "^mise-v.*-macos-arm64$"
+  # macOS has a single libc family — no `+libc.*` suffix, and no container legs
+  # (rejected at spec load on a non-Linux platform). Both assets confirmed as
+  # native Mach-O for the declared arch, not a fat binary:
+  #   $ file -b mise-v2026.8.1-macos-x64    → Mach-O 64-bit x86_64 executable
+  #   $ file -b mise-v2026.8.1-macos-arm64  → Mach-O 64-bit arm64 executable
+  darwin/amd64:
+    - "^mise-v.*-macos-x64$"
+  darwin/arm64:
+    - "^mise-v.*-macos-arm64$"
   # Pass 3 — windows. `.exe` is the raw form here; the `\.exe$` anchor is what
   # keeps the `.zip` sibling out.
   # windows/amd64:
