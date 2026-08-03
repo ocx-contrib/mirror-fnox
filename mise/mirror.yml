@@ -80,55 +80,18 @@ source:
 # `windows-11-arm`. So the END STATE of this spec is to carry NO `platforms:`
 # block at all and inherit that one.
 #
-# It is restated below only for the duration of the staged rollout (Phase 10),
-# and restated IN FULL each pass — `extends:` is a shallow top-level merge, so
-# a partial restatement replaces the base's block outright and silently drops
-# every `containers:` entry. Declaring a platform whose `assets:` pattern is
-# still commented would boot a real macOS or Windows runner that then skips
-# every version and reports SUCCESS having tested nothing, which is the cost
-# Phase 10 exists to avoid. Pass 3 DELETES this block rather than completing
-# it, which lands the inherited matrix and leaves nothing here to drift out of
-# sync with the base.
+# It was restated here for the duration of the staged rollout (Phase 10) —
+# declaring a platform whose `assets:` pattern was still commented would have
+# booted a real macOS or Windows runner that skipped every version and reported
+# SUCCESS having tested nothing, which is the cost Phase 10 exists to avoid.
+# Pass 3 DELETED that restatement rather than completing it: the six inherited
+# keys are byte-identical to what the restatement was converging on, and a
+# duplicate block is one more thing to drift out of sync with the base.
 #
 # `build_timestamp: date` and `bin_scan: off` are inherited untouched — `date`
 # is correct because mise's CalVer versions are plain `2026.8.1` with no
 # `+build` metadata for it to collide with.
-platforms:
-  linux/amd64:
-    runner: ubuntu-latest
-    containers:
-      - { image: "ubuntu:24.04", shell: bash }
-      - { image: "alpine:3.20",  shell: sh }
-      - { image: "fedora:40",    shell: bash }
-  linux/arm64:
-    # arm64 container legs run natively — no qemu — so the runner arch must
-    # match the platform or the renderer reds the leg up front.
-    runner: ubuntu-24.04-arm
-    containers:
-      - { image: "ubuntu:24.04", shell: bash }
-      - { image: "alpine:3.20",  shell: sh }
-      - { image: "fedora:40",    shell: bash }
-  darwin/amd64:
-    # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 —
-    # GitHub's native macos-13 Intel pool is exhausted and deadlocks push.
-    runner: macos-14
-    prefix: ["arch", "-x86_64"]
-  darwin/arm64:
-    runner: macos-14
-    shell: bash
-  # Pass 3 — windows. DELETE this whole `platforms:` block instead of
-  # uncommenting these two: ../mirror-base.yml already declares all six
-  # exactly as written here.
-  # windows/amd64:
-  #   runner: windows-latest
-  #   shell: pwsh
-  # windows/arm64:
-  #   # Native arm64 Windows runner — the amd64 pool cannot execute an ARM64 PE.
-  #   runner: windows-11-arm
-  #   shell: pwsh
-  # No `containers:` on darwin or windows — those runners have no Linux
-  # container engine, and the key is rejected at spec load.
-
+#
 # NO `linux/arm` LEG, and it is not an omission: mise ships `-linux-armv7`
 # assets, but ocx's platform grammar has no 32-bit ARM at all —
 # `ocx/crates/ocx_lib/src/oci/platform/architecture.rs` enumerates exactly
@@ -185,12 +148,16 @@ assets:
     - "^mise-v.*-macos-x64$"
   darwin/arm64:
     - "^mise-v.*-macos-arm64$"
-  # Pass 3 — windows. `.exe` is the raw form here; the `\.exe$` anchor is what
-  # keeps the `.zip` sibling out.
-  # windows/amd64:
-  #   - "^mise-v.*-windows-x64\\.exe$"
-  # windows/arm64:
-  #   - "^mise-v.*-windows-arm64\\.exe$"
+  # `.exe` is the raw form on Windows and the `\.exe$` anchor is what keeps the
+  # `.zip` sibling out. `asset_type.name: mise` gets the `.exe` back — the
+  # extension is re-appended when the downloaded asset carries it. Both
+  # confirmed as native PE for the declared arch:
+  #   $ file -b mise-v2026.8.1-windows-x64.exe    → PE32+ … x86-64, 5 sections
+  #   $ file -b mise-v2026.8.1-windows-arm64.exe  → PE32+ … ARM64, 7 sections
+  windows/amd64:
+    - "^mise-v.*-windows-x64\\.exe$"
+  windows/arm64:
+    - "^mise-v.*-windows-arm64\\.exe$"
 
 asset_type:
   # Raw binary on every platform — no archive to unpack. `name:` is what stops
