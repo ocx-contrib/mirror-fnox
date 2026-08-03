@@ -1,0 +1,18 @@
+---
+title: mise
+description: Polyglot dev-tool version manager, environment manager and task runner in a single static binary
+keywords: mise,mise-en-place,version-manager,dev-tools,task-runner,env,asdf,jdx,rust
+---
+
+# mise
+
+mise (*mise-en-place*) manages the tool versions, environment variables and tasks a project needs, from one `mise.toml`. It installs and pins language runtimes and CLIs across many backends (aqua, ubi, cargo, npm, go, pipx, gem, asdf and vfox plugins, …), so a checkout gets the same toolchain everywhere. It also loads per-directory environment variables the way direnv does, and runs project tasks with dependency ordering and parallelism. It is a single dependency-free binary and reads asdf's `.tool-versions` for drop-in migration.
+
+## What's included
+
+- **mise** — the CLI (`install`, `use`, `exec`, `run`, `tasks`, `env`, `activate`, `registry`, …)
+
+## Links
+
+- [mise Documentation](https://mise.jdx.dev)
+- [mise on GitHub](https://github.com/jdx/mise)

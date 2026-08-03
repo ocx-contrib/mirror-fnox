@@ -1,20 +1,21 @@
 # mirror-jdx
 
-OCX mirror for [fnox](https://github.com/jdx/fnox). One repository, one spec
+OCX mirrors for [@jdx](https://github.com/jdx) tooling. One repository, one spec
 directory per package.
 
 | Package | Spec | Publishes to | Announced as | Upstream SPDX |
 |---|---|---|---|---|
 | [fnox](https://github.com/jdx/fnox) | [`fnox/mirror.yml`](fnox/mirror.yml) | `ghcr.io/ocx-contrib/jdx/fnox` | `ocx.sh/jdx/fnox` | `MIT` |
+| [mise](https://github.com/jdx/mise) | [`mise/mirror.yml`](mise/mirror.yml) | `ghcr.io/ocx-contrib/jdx/mise` | `ocx.sh/jdx/mise` | `MIT` |
 
 Each upstream release is discovered, re-bundled, smoke-tested per
 `(version, platform)` and only then pushed with cascade tags, after which the
 result is announced into the OCX index.
 
-> This repository previously published the same upstream to the flat coordinate
+> This repository previously published `fnox` to the flat coordinate
 > `ocx.sh/fnox`. `jdx/fnox` is the grouped successor. The repo is named for the
-> upstream owner, so a second tool by [@jdx](https://github.com/jdx) lands here
-> as a sibling spec directory rather than a new repository.
+> upstream owner, which is why `mise` landed here as a sibling spec directory
+> rather than a new repository.
 
 ## Layout
 
@@ -26,6 +27,7 @@ fnox/
 ├── CATALOG.md          → ocx package describe
 ├── logo.svg / logo.png describe assets, 512px PNG
 └── tests/smoke.star    Starlark smoke test
+mise/                   same shape
 ```
 
 `LICENSE` and `NOTICE.md` are shared at the root. Logos are **not** — each
@@ -67,17 +69,38 @@ Upstream release `v1.27.0` carries **zero assets** (an aborted release, not a
 draft and not a prerelease). Every asset pattern matches nothing there, so the
 version is skipped — the correct outcome, since there is nothing to mirror.
 
+`mise` reaches the same conclusion from its own measurement, so it inherits the
+same matrix: the `-musl` builds are static on both arches (x86-64 `static-pie`,
+aarch64 `statically linked`; zero `PT_INTERP`, zero `DT_NEEDED` on v2026.8.1),
+so both Linux keys are bare. Its gnu twins are dynamically linked against base
+glibc only — a `+libc.glibc` key *would* be honest here, unlike fnox's — but the
+two builds are functionally identical (same subcommands, same `backends ls`), so
+a second key would double the artifacts to recover nothing reachable.
+
+mise ships `-linux-armv7` assets that this mirror does not carry: ocx's platform
+grammar has no 32-bit ARM at all (`Architecture` enumerates exactly `Amd64` and
+`Arm64`). It also ships each Linux/macOS build in **four** forms — a bare
+binary plus `.tar.gz`, `.tar.xz` and `.tar.zst` — where Windows ships only
+`.exe` and `.zip`. The mirror carries the **raw** form, the only one present on
+all three OSes, and every asset pattern is end-anchored so `…-linux-x64$` picks
+neither the `.tar.*` siblings nor `…-linux-x64-musl`. A prefix pattern would
+match four assets and fail the version on ambiguity.
+
+mise is CalVer (`vYYYY.M.patch`) with an **unpadded month** — `v2026.7.0`, never
+`v2026.07.0` — and releases near-daily, so `versions.min` tracks the current
+month series rather than backfilling.
+
 ## Editing
 
 | File | Edit | Regenerate after |
 |------|------|------------------|
-| `mirror-base.yml`, `fnox/mirror.yml` | hand | yes — see below |
-| `fnox/{metadata.json,CATALOG.md,logo.*}` | hand | — |
-| `fnox/tests/smoke.star` | hand | — |
+| `mirror-base.yml`, `fnox/mirror.yml`, `mise/mirror.yml` | hand | yes — see below |
+| `<pkg>/{metadata.json,CATALOG.md,logo.*}` | hand | — |
+| `<pkg>/tests/smoke.star` | hand | — |
 | `.github/workflows/*.yml` | **generated — never hand-edit** | re-run when a spec changes |
 
 ```bash
-ocx-mirror package pipeline generate ci --spec fnox/mirror.yml
+ocx-mirror package pipeline generate ci --spec fnox/mirror.yml --spec mise/mirror.yml
 ```
 
 **Name every spec.** `--spec` *appends* rather than replaces, so a command
@@ -100,6 +123,12 @@ no `bin/` directory — so the bundle's only PATH entry is a bare
 so it has nothing to walk here. `mirror-base.yml` therefore sets `bin_scan: off`
 and `fnox/metadata.json` hand-lists `binaries: ["fnox"]` — the blessed shape for
 this layout.
+
+`mise` lands in the same place from the other direction: it has no archive at
+all (`asset_type: {type: binary, name: mise}`), so the renamed binary *is* the
+bundle root. Hand-listing is load-bearing there rather than merely accurate —
+GitHub serves the raw asset with no executable bit, and `prepare` chmods only
+the **declared** `binaries` to 0755.
 
 ## Required secrets
 

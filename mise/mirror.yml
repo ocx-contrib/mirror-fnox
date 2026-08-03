@@ -1,0 +1,242 @@
+extends: ../mirror-base.yml
+
+name: mise
+
+# Logical index package `jdx/mise` at the physical path
+# `ghcr.io/ocx-contrib/jdx/mise` — slash segments, never hyphen-flattened. The
+# first segment must be this repo's own GitHub owner: GITHUB_TOKEN only
+# authorises packages owned by the repo the workflow runs in.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/jdx/mise
+
+source:
+  type: github_release
+  owner: jdx
+  repo: mise
+  # CalVer, NOT semver: `vYYYY.M.patch`, and the MONTH IS NOT ZERO-PADDED —
+  # `v2026.7.0`, never `v2026.07.0`. `\d{1,2}` is what makes that explicit;
+  # `\d{2}` would match nothing for months 1–9 and silently mirror a third of
+  # the year. The three components still parse as semver, so version ORDERING
+  # is by parsed version and never by `published_at` (upstream's release feed
+  # is chronological but the pipeline must not depend on that).
+  tag_pattern: "^v(?P<version>\\d{4}\\.\\d{1,2}\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# mise is a Rust build and upstream ships BOTH a gnu and a musl Linux binary
+# per arch. Measured on v2026.8.1 (the newest in-range release), on the RAW
+# assets this mirror actually carries:
+#
+#   $ file mise-v2026.8.1-linux-x64-musl
+#   ELF 64-bit LSB pie executable, x86-64, static-pie linked, not stripped
+#   $ readelf -l mise-v2026.8.1-linux-x64-musl | grep -c INTERP   → 0
+#   $ readelf -d mise-v2026.8.1-linux-x64-musl | grep -c NEEDED   → 0
+#
+#   $ file mise-v2026.8.1-linux-arm64-musl
+#   ELF 64-bit LSB executable, ARM aarch64, statically linked, not stripped
+#   $ readelf -l mise-v2026.8.1-linux-arm64-musl | grep -c INTERP → 0
+#   $ readelf -d mise-v2026.8.1-linux-arm64-musl | grep -c NEEDED → 0
+#
+# No PT_INTERP and no DT_NEEDED on either arch means the artifact requires
+# NOTHING of the host userland. `os.features` states what an artifact REQUIRES,
+# so both Linux keys are BARE — tagging a static build `+libc.musl` would be a
+# false requirement that hid it from every glibc host.
+#
+# The gnu twins are deliberately NOT carried. Both are dynamically linked:
+#
+#   $ file mise-v2026.8.1-linux-x64
+#   … dynamically linked, interpreter /lib64/ld-linux-x86-64.so.2, for GNU/Linux 2.6.32
+#   $ readelf -d mise-v2026.8.1-linux-x64 | grep NEEDED
+#   libdl.so.2 libgcc_s.so.1 librt.so.1 libpthread.so.0 libm.so.6 libc.so.6
+#   $ readelf -V mise-v2026.8.1-linux-x64 | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
+#   GLIBC_2.18                                (same on the aarch64 gnu build)
+#
+# Every one of those is base glibc, so a second `+libc.glibc` key WOULD be an
+# honest claim here (unlike ../fnox/mirror.yml, where the gnu build's
+# `libudev.so.1` requirement is inexpressible). It is still not carried: two
+# keys is the fallback, not the goal, and the documented reason to pay for a
+# second one is behaviour a user can REACH that musl's libc changes. There is
+# no such behaviour to recover — the two builds are functionally identical:
+#
+#   $ diff <(mise-…-linux-x64 --help) <(mise-…-linux-x64-musl --help)      → identical
+#   $ diff <(mise-…-linux-x64 backends ls) <(mise-…-linux-x64-musl backends ls)
+#   → identical (aqua asdf cargo conda core dotnet forgejo gem github gitlab
+#     go npm pipx pkgx spm http s3 ubi vfox)
+#
+# The residual musl-vs-glibc delta is the NSS/resolver one: a static musl
+# binary uses musl's stub resolver and ignores `nsswitch.conf`. mise resolves
+# ordinary public DNS names from `/etc/resolv.conf`, which musl handles, so
+# that costs a second key's worth of artifacts and container legs to buy
+# nothing reachable.
+#
+# ─── Platform matrix ───────────────────────────────────────────────────────
+#
+# ../mirror-base.yml's block is already EXACTLY what mise's own measurement
+# demands — verified against the readelf evidence above, not inherited on
+# faith from the sibling spec: both Linux keys BARE with ubuntu + alpine +
+# fedora legs (the alpine leg being the only thing that turns the "requires
+# nothing" claim into evidence), darwin/* on `macos-14`, windows/arm64 on
+# `windows-11-arm`. So the END STATE of this spec is to carry NO `platforms:`
+# block at all and inherit that one.
+#
+# It is restated below only for the duration of the staged rollout (Phase 10),
+# and restated IN FULL each pass — `extends:` is a shallow top-level merge, so
+# a partial restatement replaces the base's block outright and silently drops
+# every `containers:` entry. Declaring a platform whose `assets:` pattern is
+# still commented would boot a real macOS or Windows runner that then skips
+# every version and reports SUCCESS having tested nothing, which is the cost
+# Phase 10 exists to avoid. Pass 3 DELETES this block rather than completing
+# it, which lands the inherited matrix and leaves nothing here to drift out of
+# sync with the base.
+#
+# `build_timestamp: date` and `bin_scan: off` are inherited untouched — `date`
+# is correct because mise's CalVer versions are plain `2026.8.1` with no
+# `+build` metadata for it to collide with.
+platforms:
+  linux/amd64:
+    runner: ubuntu-latest
+    containers:
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "alpine:3.20",  shell: sh }
+      - { image: "fedora:40",    shell: bash }
+  linux/arm64:
+    # arm64 container legs run natively — no qemu — so the runner arch must
+    # match the platform or the renderer reds the leg up front.
+    runner: ubuntu-24.04-arm
+    containers:
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "alpine:3.20",  shell: sh }
+      - { image: "fedora:40",    shell: bash }
+  # Pass 2 — darwin. Uncomment together with the `assets:` keys above.
+  # darwin/amd64:
+  #   # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 —
+  #   # GitHub's native macos-13 Intel pool is exhausted and deadlocks push.
+  #   runner: macos-14
+  #   prefix: ["arch", "-x86_64"]
+  # darwin/arm64:
+  #   runner: macos-14
+  #   shell: bash
+  # Pass 3 — windows. DELETE this whole `platforms:` block instead of
+  # uncommenting these two: ../mirror-base.yml already declares all six
+  # exactly as written here.
+  # windows/amd64:
+  #   runner: windows-latest
+  #   shell: pwsh
+  # windows/arm64:
+  #   # Native arm64 Windows runner — the amd64 pool cannot execute an ARM64 PE.
+  #   runner: windows-11-arm
+  #   shell: pwsh
+  # No `containers:` on darwin or windows — those runners have no Linux
+  # container engine, and the key is rejected at spec load.
+
+# NO `linux/arm` LEG, and it is not an omission: mise ships `-linux-armv7`
+# assets, but ocx's platform grammar has no 32-bit ARM at all —
+# `ocx/crates/ocx_lib/src/oci/platform/architecture.rs` enumerates exactly
+# `Amd64` and `Arm64` under "--- Supported ---" and has `ARM` commented out
+# under "--- Unsupported ---". Same reason there is no `linux/386` or
+# `windows/386`, neither of which upstream ships anyway.
+#
+# ─── Scope — resolution verified BOTH ways on EVERY in-range release ────────
+#
+# In range (versions.min = 2026.8.0): v2026.8.0 and v2026.8.1. Both carry 46
+# assets; neither is a prerelease or a draft; NEITHER IS ASSET-LESS (an
+# asset-less release inside the range is silently dropped by the pipeline
+# without naming itself, so this was checked, not assumed).
+#
+# ⚠️ FOUR-WAY AMBIGUITY, and the anchors are the whole defence. Every
+# linux/macos target ships the SAME build in four forms:
+#
+#   mise-v2026.8.1-linux-x64            ← carried (raw)
+#   mise-v2026.8.1-linux-x64.tar.gz
+#   mise-v2026.8.1-linux-x64.tar.xz
+#   mise-v2026.8.1-linux-x64.tar.zst
+#
+# A prefix pattern such as `^mise-v.*-linux-x64` matches all four, and >1 match
+# is a hard ambiguity error that fails the whole version. Every pattern below
+# is END-ANCHORED, so `…-linux-x64$` also excludes the musl sibling
+# `…-linux-x64-musl` and vice versa. Each pattern was grepped against the FULL
+# 46-asset list of BOTH in-range releases and matched EXACTLY ONE asset.
+#
+# The RAW form is carried rather than any archive (Phase 3): it is the only
+# form present on all three OSes — Windows ships ONLY `.exe` and `.zip`, with
+# no bare-no-extension and no `tar.*` — so one `asset_type` serves every
+# platform, and there is nothing to unpack, hence no archive-layout axis to get
+# wrong. `.tar.zst` would additionally need a zstd reader.
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   mise-v*-linux-armv7{,-musl}{,.tar.*}    — no 32-bit ARM in ocx's grammar
+#   mise-v*-linux-{x64,arm64}{,-musl}.tar.* — the same bytes, wrapped
+#   mise-v*-{macos-*,windows-*}.{tar.*,zip} — likewise
+#   mise-v*-linux-{x64,arm64}               — the gnu builds; see the libc gate
+#   install.sh{,.sig,.minisig}              — installer script, not a binary
+#   SHASUMS{256,512}.{txt,asc}{,.minisig}   — checksum/signature sidecars
+#   v<version>.tar.gz.sig                   — signature over the source tarball
+assets:
+  linux/amd64:
+    - "^mise-v.*-linux-x64-musl$"
+  linux/arm64:
+    - "^mise-v.*-linux-arm64-musl$"
+  # Pass 2 — darwin. Uncomment together with nothing else; `platforms:` (in
+  # ../mirror-base.yml) already declares both, and a platform with no matching
+  # `assets:` key never enters a version's resolved set, so its legs self-skip
+  # until this lands. macOS has a single libc family — no `+libc.*` suffix, and
+  # no container legs (rejected at spec load on a non-Linux platform).
+  # darwin/amd64:
+  #   - "^mise-v.*-macos-x64$"
+  # darwin/arm64:
+  #   - "^mise-v.*-macos-arm64$"
+  # Pass 3 — windows. `.exe` is the raw form here; the `\.exe$` anchor is what
+  # keeps the `.zip` sibling out.
+  # windows/amd64:
+  #   - "^mise-v.*-windows-x64\\.exe$"
+  # windows/arm64:
+  #   - "^mise-v.*-windows-arm64\\.exe$"
+
+asset_type:
+  # Raw binary on every platform — no archive to unpack. `name:` is what stops
+  # the tool landing on PATH as `mise-v2026.8.1-linux-x64-musl`: the downloaded
+  # asset is renamed to `mise` (`mise.exe` on Windows — the `.exe` is appended
+  # automatically when the downloaded asset carries it), so one metadata file
+  # serves every platform. The binary sits at the bundle content root, which is
+  # why PATH is a bare ${installPath} and ../mirror-base.yml's `bin_scan: off`
+  # is mandatory rather than a preference. Upstream serves the asset without an
+  # executable bit; `prepare` chmods the DECLARED `binaries` to 0755, so
+  # metadata.json hand-listing `mise` is load-bearing, not documentation.
+  type: binary
+  name: mise
+
+metadata:
+  default: metadata.json
+
+catalog:
+  logo: logo.svg
+
+versions:
+  # mise releases NEAR-DAILY (18 stable releases in July 2026 alone), so a floor
+  # at the start of the previous month would mean 25–35 versions built on every
+  # platform leg. The floor is the first release of the CURRENT month series,
+  # which spans 2 in-range stable releases (2026.8.0, 2026.8.1) — measured, not
+  # assumed. Cadence keeps the window moving on its own; nothing here needs a
+  # deep backfill.
+  min: "2026.8.0"
+  new_per_run: 5
+  poll_interval: "10 */6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: mise/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/jdx/mise/license --jq '.license.spdx_id'
+  #   MIT
+  org.opencontainers.image.licenses: "MIT"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: jdx/mise
+  fork: ocx-contrib/index

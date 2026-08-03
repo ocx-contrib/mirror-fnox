@@ -13,6 +13,7 @@ and no endorsement is implied.
 | Package | GHCR path | Upstream SPDX |
 |---|---|---|
 | `fnox` | `ghcr.io/ocx-contrib/jdx/fnox` | `MIT` |
+| `mise` | `ghcr.io/ocx-contrib/jdx/mise` | `MIT` |
 
 ---
 
@@ -34,6 +35,33 @@ statically link third-party Rust crates under permissive licenses, enumerated in
 upstream's `Cargo.toml` / `Cargo.lock`.
 
 The fnox name is used for catalog identification under nominative fair use.
+
+---
+
+## `mise`
+
+Upstream: <https://github.com/jdx/mise>
+Published to `ghcr.io/ocx-contrib/jdx/mise`.
+
+| Component | SPDX | Holder |
+|---|---|---|
+| mise (`mise`) | **MIT** | Copyright (c) Jeff Dickey / @jdx |
+
+Permissive; redistribution of the compiled binary is granted provided the
+copyright notice and permission notice are retained. Upstream publishes the
+Linux/macOS/Windows builds as bare executables with no accompanying `LICENSE`
+file, so the notice is reproduced above and the terms are those of
+<https://github.com/jdx/mise/blob/main/LICENSE>. The published binaries
+statically link third-party Rust crates under permissive licenses, enumerated in
+upstream's `Cargo.toml` / `Cargo.lock`.
+
+`mise/logo.svg` reproduces upstream's `docs/public/logo.svg` mark unmodified;
+the only addition is a light background plate, because the upstream artwork is
+black line art with no declared fill and is invisible on the dark surfaces
+catalog thumbnails land on. The mise name and mark are used for catalog
+identification under nominative fair use.
+
+---
 
 No modifications are made to any upstream artifact in this repository; they are
 republished byte-for-byte inside an OCX bundle.
