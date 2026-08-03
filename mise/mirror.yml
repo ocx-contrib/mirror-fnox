@@ -109,16 +109,20 @@ source:
 # ⚠️ FOUR-WAY AMBIGUITY, and the anchors are the whole defence. Every
 # linux/macos target ships the SAME build in four forms:
 #
-#   mise-v2026.8.1-linux-x64            ← carried (raw)
-#   mise-v2026.8.1-linux-x64.tar.gz
-#   mise-v2026.8.1-linux-x64.tar.xz
-#   mise-v2026.8.1-linux-x64.tar.zst
+#   mise-v2026.8.1-linux-x64-musl            ← carried (raw)
+#   mise-v2026.8.1-linux-x64-musl.tar.gz
+#   mise-v2026.8.1-linux-x64-musl.tar.xz
+#   mise-v2026.8.1-linux-x64-musl.tar.zst
 #
-# A prefix pattern such as `^mise-v.*-linux-x64` matches all four, and >1 match
-# is a hard ambiguity error that fails the whole version. Every pattern below
-# is END-ANCHORED, so `…-linux-x64$` also excludes the musl sibling
-# `…-linux-x64-musl` and vice versa. Each pattern was grepped against the FULL
-# 46-asset list of BOTH in-range releases and matched EXACTLY ONE asset.
+# …and the gnu build ships the same four forms again under
+# `mise-v2026.8.1-linux-x64{,.tar.gz,.tar.xz,.tar.zst}`, so a single arch has
+# EIGHT candidate assets. A prefix pattern such as `^mise-v.*-linux-x64`
+# matches all eight, and >1 match is a hard ambiguity error that fails the
+# whole version. Every pattern below is END-ANCHORED, which is what separates
+# the two families: `…-linux-x64-musl$` takes exactly the raw musl build, and
+# `…-linux-x64$` would take exactly the raw gnu one. Each pattern was grepped
+# against the FULL 46-asset list of BOTH in-range releases and matched EXACTLY
+# ONE asset.
 #
 # The RAW form is carried rather than any archive (Phase 3): it is the only
 # form present on all three OSes — Windows ships ONLY `.exe` and `.zip`, with
